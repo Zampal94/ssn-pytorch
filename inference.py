@@ -1,7 +1,10 @@
 import math
 import numpy as np
 import torch
-
+import argparse
+import os
+import imutils
+import cv2
 from skimage.color import rgb2lab
 from skimage.segmentation._slic import _enforce_label_connectivity_cython
 
@@ -38,7 +41,8 @@ def inference(image, nspix, n_iter, fdim=None, color_scale=0.26, pos_scale=2.5, 
     if weight is not None:
         from model import SSNModel
         model = SSNModel(fdim, nspix, n_iter).to("cuda")
-        model.load_state_dict(torch.load(weight))
+        checkpoint = torch.load(weight)
+        model.load_state_dict(checkpoint)#['model_state_dict']
         model.eval()
     else:
         model = lambda data: sparse_ssn_iter(data, nspix, n_iter)
@@ -62,8 +66,8 @@ def inference(image, nspix, n_iter, fdim=None, color_scale=0.26, pos_scale=2.5, 
 
     if enforce_connectivity:
         segment_size = height * width / nspix
-        min_size = int(0.06 * segment_size)
-        max_size = int(3.0 * segment_size)
+        min_size = int(0.02 * segment_size)   #0.06
+        max_size = int(3 * segment_size)    #3
         labels = _enforce_label_connectivity_cython(
             labels[None], min_size, max_size)[0]
 
@@ -75,19 +79,68 @@ if __name__ == "__main__":
     import argparse
     import matplotlib.pyplot as plt
     from skimage.segmentation import mark_boundaries
+    from skimage import color
     parser = argparse.ArgumentParser()
     parser.add_argument("--image", type=str, help="/path/to/image")
     parser.add_argument("--weight", default=None, type=str, help="/path/to/pretrained_weight")
     parser.add_argument("--fdim", default=20, type=int, help="embedding dimension")
-    parser.add_argument("--niter", default=10, type=int, help="number of iterations for differentiable SLIC")
-    parser.add_argument("--nspix", default=100, type=int, help="number of superpixels")
+    parser.add_argument("--niter", default=50, type=int, help="number of iterations for differentiable SLIC")
+    parser.add_argument("--nspix", default=650, type=int, help="number of superpixels")
     parser.add_argument("--color_scale", default=0.26, type=float)
     parser.add_argument("--pos_scale", default=2.5, type=float)
     args = parser.parse_args()
 
-    image = plt.imread(args.image)
 
+
+
+    image = plt.imread(args.image)
+    #image = cv2.imread(args.image)
     s = time.time()
     label = inference(image, args.nspix, args.niter, args.fdim, args.color_scale, args.pos_scale, args.weight)
-    print(f"time {time.time() - s}sec")
-    plt.imsave("results.png", mark_boundaries(image, label))
+   
+    plt.imsave("resultss.png", mark_boundaries(image, label))
+    plt.imsave("avg.png", color.label2rgb(label,image,kind='avg'))
+    segment = image.copy()
+
+   
+   
+    #colors = np.array([[0,0,0]], dtype=np.float32)
+    #red = color.label2rgb(label, image, colors=colors, alpha=0.3, bg_label=3, bg_color=(1, 0, 0), image_alpha=1, kind='overlay')
+    #red[label!=3] = 0
+    #plt.imsave("plsegment.png",segment)
+    #regions = measure.regionprops(label, intensity_image=image)
+    #print([r.area for r in regions])
+    #print([r.mean_intensity for r in regions])
+    ####
+
+
+    # for i in range(1,500):
+    #     i=i+1
+    #     print(i)
+    #     segment = image.copy()
+    #     segment[label!=i] = 0
+    #     cv2.imwrite("segment.png",segment)
+    #     gray = cv2.cvtColor(segment, cv2.COLOR_BGR2GRAY)
+    #     cv2.imwrite("gray.png",gray)
+    #     blurred = cv2.GaussianBlur(gray, (5, 5), 0)
+    #     thresh = cv2.threshold(blurred, 60, 255, cv2.THRESH_BINARY)[1]
+    #     cnts = cv2.findContours(thresh.copy(), cv2.RETR_EXTERNAL,
+    #         cv2.CHAIN_APPROX_SIMPLE)
+    #     cnts = imutils.grab_contours(cnts)
+    #     for c in cnts:
+    #         M = cv2.moments(c)
+          
+    #         leftmost = tuple(c[c[:,:,0].argmin()][0])
+    #         rightmost = tuple(c[c[:,:,0].argmax()][0])
+    #         topmost = tuple(c[c[:,:,1].argmin()][0])
+    #         bottommost = tuple(c[c[:,:,1].argmax()][0]) 
+    #         if (topmost[1]!=bottommost[1] and leftmost[0]!=rightmost[0]): 
+    #             print(bottommost) 
+    #             print(leftmost) 
+    #             print(rightmost) 
+    #             print(topmost) 
+                
+    #             crop_img = segment[topmost[1]:bottommost[1],leftmost[0]:rightmost[0]]
+            
+
+    #             cv2.imwrite(('superpixel/'+ str(i)+'crop.png'),crop_img)

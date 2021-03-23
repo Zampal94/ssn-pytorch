@@ -4,7 +4,8 @@ import time
 import torch
 import torch.optim as optim
 from torch.utils.data import DataLoader
-
+#from torch.utils.tensorboard import SummaryWriter
+import torchvision 
 from lib.utils.meter import Meter
 from model import SSNModel
 from lib.dataset import bsds, augmentation
@@ -86,8 +87,8 @@ def update_param(data, model, optimizer, compactness, color_scale, pos_scale, de
     optimizer.zero_grad()
     loss.backward()
     optimizer.step()
-
-    return {"loss": loss.item(), "reconstruction": recons_loss.item(), "compact": compact_loss.item()}
+    return loss
+    #return {"loss": loss.item(), "reconstruction": recons_loss.item(), "compact": compact_loss.item()}
 
 
 def train(cfg):
@@ -97,8 +98,11 @@ def train(cfg):
         device = "cpu"
 
     model = SSNModel(cfg.fdim, cfg.nspix, cfg.niter).to(device)
-
+    checkpoint = torch.load("/home/janischl/ssn-pytorch/log/bset_model_20210903.pth")
+    model.load_state_dict(checkpoint['model_state_dict'])
+    
     optimizer = optim.Adam(model.parameters(), cfg.lr)
+    optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
 
     augment = augmentation.Compose([augmentation.RandomHorizontalFlip(), augmentation.RandomScale(), augmentation.RandomCrop()])
     train_dataset = bsds.BSDS(cfg.root, geo_transforms=augment)
@@ -108,27 +112,33 @@ def train(cfg):
     test_loader = DataLoader(test_dataset, 1, shuffle=False, drop_last=False)
 
     meter = Meter()
-
+    #writer = SummaryWriter()
     iterations = 0
     max_val_asa = 0
     while iterations < cfg.train_iter:
         for data in train_loader:
             iterations += 1
             metric = update_param(data, model, optimizer, cfg.compactness, cfg.color_scale, cfg.pos_scale,  device)
-            meter.add(metric)
-            state = meter.state(f"[{iterations}/{cfg.train_iter}]")
-            print(state)
+            #meter.add(metric)
+            #state = meter.state(f"[{iterations}/{cfg.train_iter}]")
+            #writer.add_scalar('loss_bsds',metric, iterations)
+            #print(state)
             if (iterations % cfg.test_interval) == 0:
                 asa = eval(model, test_loader, cfg.color_scale, cfg.pos_scale,  device)
                 print(f"validation asa {asa}")
                 if asa > max_val_asa:
                     max_val_asa = asa
-                    torch.save(model.state_dict(), os.path.join(cfg.out_dir, "bset_model.pth"))
+                    torch.save({'model_state_dict': model.state_dict(),
+                    'optimizer_state_dict': optimizer.state_dict()}, os.path.join(cfg.out_dir, "bset_model_20210903.pth"))
+                    #torch.save(model.state_dict(), os.path.join(cfg.out_dir, "bset_model_20210903.pth"))
             if iterations == cfg.train_iter:
                 break
+            if iterations % 1000 == 0:
+                    torch.save({'model_state_dict': model.state_dict(),
+                    'optimizer_state_dict': optimizer.state_dict()}, os.path.join(cfg.out_dir, "bset_model_20210903.pth"))
 
     unique_id = str(int(time.time()))
-    torch.save(model.state_dict(), os.path.join(cfg.out_dir, "model"+unique_id+".pth"))
+    
 
 
 if __name__ == "__main__":
@@ -140,12 +150,12 @@ if __name__ == "__main__":
     parser.add_argument("--batchsize", default=6, type=int)
     parser.add_argument("--nworkers", default=4, type=int, help="number of threads for CPU parallel")
     parser.add_argument("--lr", default=1e-4, type=float, help="learning rate")
-    parser.add_argument("--train_iter", default=500000, type=int)
+    parser.add_argument("--train_iter", default=100000, type=int)
     parser.add_argument("--fdim", default=20, type=int, help="embedding dimension")
     parser.add_argument("--niter", default=5, type=int, help="number of iterations for differentiable SLIC")
-    parser.add_argument("--nspix", default=100, type=int, help="number of superpixels")
+    parser.add_argument("--nspix", default=600, type=int, help="number of superpixels")
     parser.add_argument("--color_scale", default=0.26, type=float)
-    parser.add_argument("--pos_scale", default=2.5, type=float)
+    parser.add_argument("--pos_scale", default=2.0, type=float)
     parser.add_argument("--compactness", default=1e-5, type=float)
     parser.add_argument("--test_interval", default=10000, type=int)
 
