@@ -42,19 +42,21 @@ class BSDS:
 
         gt = gt.astype(np.int64)
         img = img.astype(np.float32)
-
+        
         if self.color_transforms is not None:
             img = self.color_transforms(img)
 
         if self.geo_transforms is not None:
             img, gt = self.geo_transforms([img, gt])
-
+   
         gt = convert_label(gt)
+        
         gt = torch.from_numpy(gt)
         img = torch.from_numpy(img)
         img = img.permute(2, 0, 1)
+        gt = gt.reshape(50, -1).float()
 
-        return img, gt.reshape(50, -1).float()
+        return img, gt
 
 
     def __len__(self):
