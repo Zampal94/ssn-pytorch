@@ -1,9 +1,6 @@
-
 import sys
-#sys.path.append("home/janischl/HRNet/tools")
-sys.path.insert(1, '/home/janischl/HRNet-Image-Classification/tools')
-from valid import main
-
+sys.path.insert(1, '/home/janischl/deep-metric-learning-tsinghua-dogs/src/')
+from infer_siamese import main
 import matplotlib.pyplot as plt
 
 import numpy as np
@@ -14,69 +11,25 @@ import torch.nn.functional as F
 from torchvision import datasets, transforms, models
 from PIL import Image
 from torch.autograd import Variable
-#drive.mount('/content/gdrive')
+
 data_dir = '/home/janischl/ssn-pytorch/classify/train'
-test_transforms = transforms.Compose([ transforms.Resize((224,300)),
-                                      transforms.ToTensor(),
-                                      #transforms.Normalize([0.485, 0.456, 0.406],
-                                      #                     [0.229, 0.224, 0.225])
-                                     ])
-
-
 
 import math
-import numpy as np
-import torch
 import argparse
 import os
 import imutils
 import cv2
 from skimage.color import rgb2lab
 from skimage.segmentation._slic import _enforce_label_connectivity_cython
-
 from lib.ssn.ssn import sparse_ssn_iter
 
-def predict_image(image):
-    
-    device = 'cuda'
-  
-
-    
-    #image_tensor = test_transforms(image).float()
-    #image_tensor = image_tensor.unsqueeze_(0)
-    #input = Variable(image_tensor)
-    #input = input.to(device)
-    output = main(image)
-    #index = output.data.cpu().numpy().argmax()
-    return output 
+def predict_image(image_vec):
+    output, path = main(image_vec)
+    return output, path 
 
 @torch.no_grad()
 def inference(image, nspix, n_iter, fdim=None, color_scale=0.26, pos_scale=2.5, weight=None, enforce_connectivity=True):
-    """
-    generate superpixels
 
-    Args:
-        image: numpy.ndarray
-            An array of shape (h, w, c)
-        nspix: int
-            number of superpixels
-        n_iter: int
-            number of iterations
-        fdim (optional): int
-            feature dimension for supervised setting
-        color_scale: float
-            color channel factor
-        pos_scale: float
-            pixel coordinate factor
-        weight: state_dict
-            pretrained weight
-        enforce_connectivity: bool
-            if True, enforce superpixel connectivity in postprocessing
-
-    Return:
-        labels: numpy.ndarray
-            An array of shape (h, w)
-    """
     if weight is not None:
         from model import SSNModel
         model = SSNModel(fdim, nspix, n_iter).to("cuda")
@@ -130,30 +83,14 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
 
-
-
-    #image = plt.imread(args.image)
-    image = cv2.imread('/home/janischl/ssn-pytorch/img_luca/5_4_2.png') 
+    image = cv2.imread('/home/janischl/ssn-pytorch/img_luca/2_7_4.png') 
     s = time.time()
     label = inference(image, args.nspix, args.niter, args.fdim, args.color_scale, args.pos_scale, args.weight)
-   
-    #plt.imsave("resultss.png", mark_boundaries(image, label))
-    #plt.imsave("avg.png", color.label2rgb(label,image,kind='avg'))
+
     segment = image.copy()
-
-   
-   
-    #colors = np.array([[0,0,0]], dtype=np.float32)
-    #red = color.label2rgb(label, image, colors=colors, alpha=0.3, bg_label=3, bg_color=(1, 0, 0), image_alpha=1, kind='overlay')
-    #red[label!=3] = 0
-    #plt.imsave("plsegment.png",segment)
-    #regions = measure.regionprops(label, intensity_image=image)
-    #print([r.area for r in regions])
-    #print([r.mean_intensity for r in regions])
-    ####
-
     mask=image.copy()
-    for i in range(0,1000):
+    image_vec = []
+    for i in range(0,1500):
        
         print(i)
         segment = image.copy()
@@ -183,6 +120,7 @@ if __name__ == "__main__":
                
                 horizontal = rightmost[0]- leftmost[0] 
                 vertikal = bottommost[1]-topmost[1]
+                
                 if (horizontal > oldhorizontal or vertikal > oldvertikal):
                     oldhorizontal = horizontal
                     oldvertikal = vertikal
@@ -201,59 +139,69 @@ if __name__ == "__main__":
                     cbottommost = bottommost[1] + int(restv/2)
                     ctopmost = topmost[1] - int(restv/2)
 
-                    if (cleftmost>=1 and crightmost<=2391 and ctopmost>=1 and cbottommost<=1143):
-                    
-            
+                    if (cleftmost>=1 and crightmost<=2391 and ctopmost>=1 and cbottommost<=1143):        
                         crop_img = segment[ctopmost:cbottommost,cleftmost:crightmost]
                     else:
+                        if (vertikal<224):
+                            restv = 224 - vertikal
+                        else:
+                            restv=0
+                        if (horizontal<224):
+                            resth = 224 - horizontal
+                        else:
+                            resth = 0
+                        crop_img = segment[topmost[1]:bottommost[1],leftmost[0]:rightmost[0]] 
+                        crop_img = cv2.copyMakeBorder(crop_img, int(restv/2), int(restv/2), int(resth/2), int(resth/2), cv2.BORDER_CONSTANT, value=[0, 0, 0])         
+                        #crop_img = np.pad(crop_img[:,:,2], ((int(restv/2),int(restv/2)),(int(resth/2),int(resth/2))), mode='constant', constant_values=0)
                         
-                        crop_img = segment[topmost[1]:bottommost[1],leftmost[0]:rightmost[0]]
+                        cv2.imwrite("/home/janischl/ssn-pytorch/classify/added.png",crop_img)
                     
-
-        #           cv2.imwrite(('superpixel/'+ str(i)+'crop.png'),crop_img)
-
-
-
-            
-
-        #im_pil = Image.fromarray(crop_img)
-        
         crop_img = cv2.cvtColor(crop_img, cv2.COLOR_BGR2RGB)
         to_pil = transforms.ToPILImage()
-        #images, labels = get_random_images(5)
-        #fig=plt.figure(figsize=(10,10))
-        #imagee = to_pil(crop_img)
+    
         imagee = transforms.ToPILImage()(crop_img)
-        index = predict_image(imagee)
+        image_vec.append(imagee)
+        #print(image_vec)
+    distance, paths = predict_image(image_vec)
 
-        #Background 0 #Chip 3 # Flankwear 3 #Tool 4
-        print(index)
-        if (index == 1):
-            mask[label==i] = [255,255,255]
-        if (index == 0):
-            mask[label==i] = [0,0,0]
-        if (index==3):
-            mask[label==i] = [0,240,255]
-        if (index==4):
-            mask[label==i] = [200,200,200]
-        if (index==5):
-            mask[label==i] = [200,200,200]
-        if (index==3):
-            mask[label==i] = [5,5,225]   
-        cv2.imwrite(('/home/janischl/ssn-pytorch/classify/mask_224_luca.png'),mask)
-        i=i+1
-                #sub = fig.add_subplot(1, len(crop_img), ii+1)
-                #res = int(labels[ii]) == index
-                #sub.set_title(str([index]) + ":" + str(res))
-                #print(res)
-                    #plt.axis('off')
-                    #plt.imshow(image)
-                #plt.show()
-                 
+     
+    print("distance")
+    print(distance)
+    k = 0
+    for path in paths:
+        head, tail = os.path.split(path)
+        print(head)
+        background_path = "/home/janischl/Dataset/imagenet/images/valid/Background"
 
+        tool_path = "/home/janischl/Dataset/imagenet/images/valid/Tool"
+     
+        flankwear_path = "/home/janischl/Dataset/imagenet/images/valid/Flankwear"
 
+        if(head == background_path):
+            print("background")
+            mask[label==k] = [0,0,0]
+    
+            
+        if(head == tool_path):
+            print("tool")
+            mask[label==k] = [5,5,225] 
+     
+        if (head == flankwear_path):
+            mask[label==k] = [255,255,255]
+    
+        cv2.imwrite(('/home/janischl/ssn-pytorch/classify/mask_generated__onlyref_3class.png'),mask)
+        k=k+1
 
-                
+                     # if (index == 0):
+        #     mask[label==i] = [0,0,0]
+        # if (index==3):
+        #     mask[label==i] = [0,240,255]
+        # if (index==4):
+        #     mask[label==i] = [200,200,200]
+        # if (index==5):
+        #     mask[label==i] = [200,200,200]
+        # if (index==3):
+        #     mask[label==i] = [5,5,225]  
            
 
      

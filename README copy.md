@@ -45,3 +45,5 @@ conda install pytorch torchvision cudatoolkit=10.2 -c pytorch
 
 device 1
 pip install torchvision==0.4.0 -f https://download.pytorch.org/whl/torch_stable.html
+
+ tar -czvf director/Flankwear.tar.gz /home/janischl/ssn-pytorch/train_0904/Flankwear
