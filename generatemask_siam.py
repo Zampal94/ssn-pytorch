@@ -77,20 +77,20 @@ if __name__ == "__main__":
     parser.add_argument("--weight", default="/home/janischl/ssn-pytorch/log/bset_model.pth", type=str, help="/path/to/pretrained_weight")
     parser.add_argument("--fdim", default=20, type=int, help="embedding dimension")
     parser.add_argument("--niter", default=50, type=int, help="number of iterations for differentiable SLIC")
-    parser.add_argument("--nspix", default=650, type=int, help="number of superpixels")
+    parser.add_argument("--nspix", default=200, type=int, help="number of superpixels") #650
     parser.add_argument("--color_scale", default=0.26, type=float)
     parser.add_argument("--pos_scale", default=2.5, type=float)
     args = parser.parse_args()
 
 
-    image = cv2.imread('/home/janischl/ssn-pytorch/img_luca/2_7_4.png') 
+    image = cv2.imread('/home/janischl/ssn-pytorch/bocholt_test/A035 - 20181210_154420.png') 
     s = time.time()
     label = inference(image, args.nspix, args.niter, args.fdim, args.color_scale, args.pos_scale, args.weight)
 
     segment = image.copy()
     mask=image.copy()
     image_vec = []
-    for i in range(0,1500):
+    for i in range(0,300):
        
         print(i)
         segment = image.copy()
@@ -139,7 +139,7 @@ if __name__ == "__main__":
                     cbottommost = bottommost[1] + int(restv/2)
                     ctopmost = topmost[1] - int(restv/2)
 
-                    if (cleftmost>=1 and crightmost<=2391 and ctopmost>=1 and cbottommost<=1143):        
+                    if (cleftmost>=1 and crightmost<=1024 and ctopmost>=1 and cbottommost<=256):        
                         crop_img = segment[ctopmost:cbottommost,cleftmost:crightmost]
                     else:
                         if (vertikal<224):
@@ -167,41 +167,84 @@ if __name__ == "__main__":
      
     print("distance")
     print(distance)
+    
     k = 0
     for path in paths:
-        head, tail = os.path.split(path)
-        print(head)
-        background_path = "/home/janischl/Dataset/imagenet/images/valid/Background"
-
-        tool_path = "/home/janischl/Dataset/imagenet/images/valid/Tool"
-     
-        flankwear_path = "/home/janischl/Dataset/imagenet/images/valid/Flankwear"
-
-        if(head == background_path):
-            print("background")
-            mask[label==k] = [0,0,0]
-    
+        header = []
+        dinstances = distance[k]
+        first_distance = dinstances[0]
+        if (first_distance <=0.02):
             
-        if(head == tool_path):
-            print("tool")
-            mask[label==k] = [5,5,225] 
-     
-        if (head == flankwear_path):
-            mask[label==k] = [255,255,255]
-    
-        cv2.imwrite(('/home/janischl/ssn-pytorch/classify/mask_generated__onlyref_3class.png'),mask)
-        k=k+1
+            for u in range(0,5):
+                head, tail = os.path.split(path[u])
+                header.append(head)
+                #print(head)
 
-                     # if (index == 0):
-        #     mask[label==i] = [0,0,0]
-        # if (index==3):
-        #     mask[label==i] = [0,240,255]
-        # if (index==4):
-        #     mask[label==i] = [200,200,200]
-        # if (index==5):
-        #     mask[label==i] = [200,200,200]
-        # if (index==3):
-        #     mask[label==i] = [5,5,225]  
+            background_path = "/home/janischl/ssn-pytorch/train_bocholt/Background"
+            tool_path = "/home/janischl/ssn-pytorch/train_bocholt/Tool"
+            groove_path =  "/home/janischl/ssn-pytorch/train_bocholt/Groove"
+            flankwear_path = "/home/janischl/ssn-pytorch/train_bocholt/Flankwear"
+                
            
 
-     
+            if(header[0] == background_path):
+                print("background")
+                mask[label==k] = [0,0,0]
+        
+                
+            if(header[0] == tool_path):
+                print("tool")
+                mask[label==k] = [5,5,225] 
+        
+            if (header[0] == flankwear_path or head == groove_path):
+                print("flank")
+                mask[label==k] = [255,255,255]
+            print(path[0])
+            print(first_distance)
+            cv2.imwrite(('/home/janischl/ssn-pytorch/bocholt_test/A023_20181212_143533.png'),mask)
+                
+
+                        # if (index == 0):
+            #     mask[label==i] = [0,0,0]
+            # if (index==3):
+            #     mask[label==i] = [0,240,255]
+            # if (index==4):
+            #     mask[label==i] = [200,200,200]
+            # if (index==5):
+            #     mask[label==i] = [200,200,200]
+            # if (index==3):
+            #     mask[label==i] = [5,5,225] 
+            # 
+        else:
+            print("check others")
+            print (first_distance)
+            back_num =0
+            tool_num =0
+            groove_num = 0
+            back_distance =0
+            tool_distance =0
+            groove_distance = 0
+            for j in range(0,5):
+                head, tail = os.path.split(path[j])
+                
+                if(head == background_path):
+                    back_num+=1
+                    back_distance+=dinstances[j]
+                if(head == tool_path):
+                    tool_num+=1
+                    tool_distance+=dinstances[j]
+                if (head == flankwear_path or head == groove_path):
+                    groove_num+=1
+                    groove_distance+=dinstances[j]
+            if (back_num > tool_num and back_num > groove_num and (back_distance/back_num)<0.04):
+                
+                mask[label==k] = [0,0,0]
+            if (back_num < tool_num and tool_num >  groove_num and (tool_distance/tool_num)<0.04):
+                mask[label==k] = [5,5,225] 
+            if (back_num < groove_num and tool_num <  groove_num and (groove_distance/groove_num)<0.04):
+                mask[label==k] = [255,255,255] 
+                    
+
+        k=k+1        
+
+        

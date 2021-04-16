@@ -2,7 +2,7 @@
 import sys
 
 import matplotlib.pyplot as plt
-
+from skimage.segmentation import mark_boundaries
 import numpy as np
 import torch
 from torch import nn
@@ -101,28 +101,28 @@ if __name__ == "__main__":
     parser.add_argument("--weight", default="/home/janischl/ssn-pytorch/log/bset_model.pth", type=str, help="/path/to/pretrained_weight")
     parser.add_argument("--fdim", default=20, type=int, help="embedding dimension")
     parser.add_argument("--niter", default=50, type=int, help="number of iterations for differentiable SLIC")
-    parser.add_argument("--nspix", default=650, type=int, help="number of superpixels")
+    parser.add_argument("--nspix", default=200, type=int, help="number of superpixels")  #650
     parser.add_argument("--color_scale", default=0.26, type=float)
     parser.add_argument("--pos_scale", default=2.5, type=float)
     args = parser.parse_args()
 
 
 
-    for img in os.listdir("/home/janischl/ssn-pytorch/img"):
+    for img in os.listdir("/home/janischl/ssn-pytorch/img_bocholt"):
         pathname = os.path.basename(img)
         
         filename = os.path.splitext(pathname)[0]
         print(pathname)
-        img_path = ("/home/janischl/ssn-pytorch/img/"+pathname)
+        img_path = ("/home/janischl/ssn-pytorch/img_bocholt/"+pathname)
         print(img_path)
-        mask_path = ("/home/janischl/ssn-pytorch/mask/"+filename+".png")
+        mask_path = ("/home/janischl/ssn-pytorch/mask_bocholt/"+filename+"_mask.png")
         image = cv2.imread(img_path)
         mask = cv2.imread(mask_path)
   
-        
+        test_image = plt.imread(img_path)
         s = time.time()
         label = inference(image, args.nspix, args.niter, args.fdim, args.color_scale, args.pos_scale, args.weight)
-    
+        plt.imsave("sp.png", mark_boundaries(test_image, label))
         segment = image.copy()
 
     
@@ -148,9 +148,13 @@ if __name__ == "__main__":
                 rightmost = tuple(c[c[:,:,0].argmax()][0])
                 topmost = tuple(c[c[:,:,1].argmin()][0])
                 bottommost = tuple(c[c[:,:,1].argmax()][0]) 
-                if (topmost[1]<=(bottommost[1]-10) and leftmost[0]<=(rightmost[0]-10)): 
+                if (topmost[1]<=(bottommost[1]-2) and leftmost[0]<=(rightmost[0]-2)): 
+                    
                     cX = int(M["m10"] / M["m00"])
                     cY = int(M["m01"] / M["m00"])
+                   
+               
+
                     r,g,b = mask[cY, cX]
                     print (r,g,b)
                     print(bottommost) 
@@ -176,17 +180,17 @@ if __name__ == "__main__":
                         cbottommost = bottommost[1] + int(restv/2)
                         ctopmost = topmost[1] - int(restv/2)
                     
-                        if (cleftmost>=1 and crightmost<=2391 and ctopmost>=1 and cbottommost<=1143):        
+                        if (cleftmost>=1 and crightmost<=1024 and ctopmost>=1 and cbottommost<=256):        
                             crop_img = segment[ctopmost:cbottommost,cleftmost:crightmost]
                             
                             if (r==0 and g==0 and b==0):
-                                cv2.imwrite(('/home/janischl/ssn-pytorch/train_0904/Background/'+filename+str(i)+'edge.png'),crop_img)
+                                cv2.imwrite(('/home/janischl/ssn-pytorch/train_bocholt/Background/'+filename+str(i)+'.png'),crop_img)
                             if (r==5 and g==5 and b==255):
-                                cv2.imwrite(('/home/janischl/ssn-pytorch/train_0904/Tool/'+filename+str(i)+'edge.png'),crop_img)
+                                cv2.imwrite(('/home/janischl/ssn-pytorch/train_bocholt/Tool/'+filename+str(i)+'.png'),crop_img)
                             if (r==0 and g==240 and b==255):
-                                cv2.imwrite(('/home/janischl/ssn-pytorch/train_0904/Groove/'+filename+str(i)+'.png'),crop_img)
+                                cv2.imwrite(('/home/janischl/ssn-pytorch/train_bocholt/Groove/'+filename+str(i)+'.png'),crop_img)
                             if (r==255 and g==255 and b==255):
-                                cv2.imwrite(('/home/janischl/ssn-pytorch/train_0904/Flankwear/'+filename+str(i)+'.png'),crop_img)
+                                cv2.imwrite(('/home/janischl/ssn-pytorch/train_bocholt/Flankwear/'+filename+str(i)+'.png'),crop_img)
                             #if (r==192 and g==192 and b==192):
                             #    cv2.imwrite(('/home/janischl/ssn-pytorch/train_img/Breakage/'+filename+str(i)+'.png'),crop_img)
                             #if (r==0 and g==64 and b==0):
@@ -208,11 +212,13 @@ if __name__ == "__main__":
                             #cv2.imwrite("/home/janischl/ssn-pytorch/classify/added.png",crop_img) 
 
                         
-                            if (topmost[1]==0 or bottommost[1]==2390 or leftmost[0]== 0 or rightmost[0]>=1130):
-                                if (r==0 and g==0 and b==0):
-                                    cv2.imwrite(('/home/janischl/ssn-pytorch/train_0904/Background/'+filename+str(i)+'edge.png'),crop_img)
-                                if (r==5 and g==5 and b==255):
-                                    cv2.imwrite(('/home/janischl/ssn-pytorch/train_0904/Tool/'+filename+str(i)+'edge.png'),crop_img)
+                          
+                            if (r==0 and g==0 and b==0):
+                                cv2.imwrite(('/home/janischl/ssn-pytorch/train_bocholt/Background/'+filename+str(i)+'edge.png'),crop_img)
+                            if (r==5 and g==5 and b==255):
+                                cv2.imwrite(('/home/janischl/ssn-pytorch/train_bocholt/Tool/'+filename+str(i)+'edge.png'),crop_img)
+                            if (r==255 and g==255 and b==255):
+                                cv2.imwrite(('/home/janischl/ssn-pytorch/train_bocholt/Flankwear/'+filename+str(i)+'edge.png'),crop_img)
                             #if (r==0 and g==240 and b==255):
                             #    cv2.imwrite(('/home/janischl/ssn-pytorch/train_edge/Groove/'+filename+str(i)+'.png'),crop_img)
                             #if (r==255 and g==255 and b==255):

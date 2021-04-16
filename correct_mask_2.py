@@ -177,7 +177,7 @@ def correct_white(image):
  
         if (topmost[1]<=(bottommost[1]) and leftmost[0]<=(rightmost[0])):
            
-            cv2.imwrite(('/home/janischl/ssn-pytorch/hä.png'),image)
+            
             M = cv2.moments(c)
             if (M["m00"]>0):
                 cX = int(M["m10"] / M["m00"])
@@ -220,7 +220,26 @@ def correct_white(image):
 
 def correct_red(image):
 
-    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    mask_a = image.copy()
+    lower_white = np.array([5,5,225]) 
+    upper_white = np.array([5,5,225]) 
+    single=0
+    single = cv2.inRange(mask_a, lower_white, upper_white )
+    mask_a[single>0]=(55,55,55)
+
+    lower_white = np.array([255,255,255]) 
+    upper_white = np.array([255,255,225]) 
+    single=0
+    single = cv2.inRange(mask_a, lower_white, upper_white )
+    mask_a[single>0]=(0,0,0)
+
+    lower_white = np.array([55,55,55]) 
+    upper_white = np.array([55,55,55]) 
+    single=0
+    single = cv2.inRange(mask_a, lower_white, upper_white )
+    mask_a[single>0]=(255,255,255)
+
+    gray = cv2.cvtColor(mask_a, cv2.COLOR_BGR2GRAY)
     blurred = cv2.GaussianBlur(gray, (5, 5), 0)
     thresh = cv2.threshold(blurred, 60, 255, cv2.THRESH_BINARY)[1]
     cnts = cv2.findContours(thresh.copy(), cv2.RETR_EXTERNAL,
@@ -246,7 +265,7 @@ def correct_red(image):
         
         ## blowing up the contour a little
         cnt_norm = c - [cX, cY]
-        cnt_scaled = cnt_norm * 1.05
+        cnt_scaled = cnt_norm * 1.1
         cnt_scaled = cnt_scaled + [cX, cY]
         cnt_scaled = cnt_scaled.astype(np.int32)
         cunts.append(cnt_scaled)
@@ -261,13 +280,19 @@ def correct_red(image):
         vertikal = bottommost[1]-topmost[1]
                         
         if (topmost[1]<=(bottommost[1]) and leftmost[0]<=(rightmost[0])):
-                        
+            M = cv2.moments(c)
+            if (M["m00"]>0):
+                cX = int(M["m10"] / M["m00"])
+                cY = int(M["m01"] / M["m00"])
+            else:
+                cX = leftmost[0]
+                cY= leftmost[1]            
             r,g,b = image[cY, cX]
-
+            
             if(r==5 and g==5 and b==225 and horizontal<400):
             
                 cimg= np.zeros_like(image.copy())
-                cv2.drawContours(cimg, cunts, num, color=24, thickness=10)
+                cv2.drawContours(cimg, cunts, num, color=24, thickness=8)
                 cv2.drawContours(cimg, cunts, num, color=24, thickness=-1)
                 pts = np.where(cimg == 24)
                 masksegment[pts[0],pts[1]] = [55,55,55]
@@ -277,15 +302,16 @@ def correct_red(image):
                 if not (np.any(crop_mask==[5,5,225]) or np.any(crop_mask==[255,255,255])): 
                     print("Faulty red")
                     mask_final[pts[0],pts[1]] = [0,0,0]
-                    
-        num+=1
+              
+        num=num+1
     return mask_final
 
 if __name__ == "__main__":
 
-    mask = cv2.imread('/home/janischl/ssn-pytorch/classify/mask_generated_8_7_4_onlyref_3class.png') 
-    mask = correct_black(mask)  ## corrects faulty black (background) superpixels that are completely spourrounded by red or white superpixels
+    mask = cv2.imread('/home/janischl/ssn-pytorch/classify/mask_8_7_4_onsamedomain_big.png') 
+   
     mask = correct_red(mask)    ## corrects faulty red (tool) superpixels that are completely spourrounded by black superpixels
+    mask = correct_black(mask)  ## corrects faulty black (background) superpixels that are completely spourrounded by red or white superpixels
     mask = correct_white(mask)  ## corrects faulty white (wear) superpixels that are completely spourrounded by black or red superpixels (red superpixels sourrounding is actually possible to be right)
     cv2.imwrite(('final_correct.png'),mask)
 
